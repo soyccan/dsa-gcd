@@ -1,0 +1,20 @@
+主要有的原始碼有：
+- hw1_5.c：1-5 主程式
+- hw1_6.c：1-6 主程式，依賴 bigint10.c 和 bigint10.h
+- bigint10.c：把大數運算獨立成一個模版，利於之後擴充
+- bigint10.h：前者的標頭檔
+- bigint10-test.c：測試程式
+
+原始碼都用 clang-format 排版過，利於閱讀
+
+make 會產生：
+- hw1_5：1-5 主程式
+- hw1_6：1-6 主程式
+
+make DEBUG=1 會產生 (測試用版本)：
+- hw1_5：1-5 主程式
+- hw1_6：1-6 主程式
+- bigint10-test：測試程式
+
+其它
+- hw1_6-test.py：生測資
