@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wextra -Wall -Wconversion -O2
+CFLAGS = -Wextra -Wall -Wconversion -O3
 source = hw1_5 hw1_6
 
 ifeq ("$(DEBUG)", "1")

@@ -16,10 +16,10 @@ typedef struct {
 #ifndef NDEBUG
 #define PRINT_BIGINT(x)                     \
     {                                       \
-        printf("neg %d; ", (x)->neg);       \
-        for (size_t i = 0; i < (x)->n; i++) \
-            printf("%hhd ", (x)->a[i]);     \
-        puts("");                           \
+        fprintf(stderr, "neg %d; ", (x)->neg);       \
+        for (size_t i = 0; i < (x)->len; i++) \
+            fprintf(stderr, "%hhd ", (x)->__arr[i]);     \
+        fprintf(stderr,"\n");                           \
     }
 #else
 #define PRINT_BIGINT(...)

@@ -2,7 +2,7 @@
 
 #include "soyccan.h"
 
-// static char buf[0x500];
+// static char buf[0x1000];
 
 static inline void __bigint_inverse_array(BigInt* x)
 {
@@ -24,7 +24,9 @@ static void __bigint_carry(BigInt* x)
         return;
     while (x->len > 1 && x->__arr[x->len - 1] == 0)
         x->len--;
-    x->__arr[x->len] = 0;
+    if (x->len >= x->cap) // we must reserve an extra entry for...
+        __bigint_grow(x); // ...
+    x->__arr[x->len] = 0; // this line to use.
     for (size_t i = 0; i < x->len; i++) {
         bool b = x->__arr[i] < 0 && x->__arr[i] % 10 != 0;
         x->__arr[i + 1] += x->__arr[i] / 10 - b;
@@ -32,8 +34,6 @@ static void __bigint_carry(BigInt* x)
     }
     if (x->__arr[x->len] != 0) {
         x->len++;
-        if (x->len >= x->cap)
-            __bigint_grow(x);
     }
     if (x->__arr[x->len - 1] < 0) {
         __bigint_inverse_array(x);
@@ -171,8 +171,10 @@ BigInt* bigint_mul(const BigInt* x, const BigInt* y, BigInt* z)
     }
     for (size_t i = 0; i < x->len; i++) {
         for (size_t j = 0; j < y->len; j++) {
-            signed char t = x->__arr[i] * y->__arr[j];
-            z->__arr[i + j] += t % 10;
+            // TODO: will this overflow ?
+            int t = z->__arr[i + j] + x->__arr[i] * y->__arr[j];
+            z->__arr[i + j] = t % 10;
+            assert(z->__arr[i+j+1] <= 127 - t / 10);
             z->__arr[i + j + 1] += t / 10;
         }
     }
@@ -199,12 +201,15 @@ BigInt* bigint_parsestr(const char* str, size_t len, BigInt* x)
     while (len > 0 && (str[len] < '0' || str[len] > '9'))
         len--;
     while (len > 0 && str[len] >= '0' && str[len] <= '9') {
-        x->__arr[x->len++] = str[len--] - '0';
         if (x->len >= x->cap)
             __bigint_grow(x);
-    }
-    if (len >= 0 && str[len] >= '0' && str[len] <= '9')
         x->__arr[x->len++] = str[len--] - '0';
+    }
+    if (len >= 0 && str[len] >= '0' && str[len] <= '9') {
+        if (x->len >= x->cap)
+            __bigint_grow(x);
+        x->__arr[x->len++] = str[len--] - '0';
+    }
     if (len >= 0 && str[len] == '-')
         x->neg = true;
     return x;
@@ -264,40 +269,40 @@ BigInt* bigint_gcd(const BigInt* x, const BigInt* y, BigInt* z)
         m = &a;
     }
     while (!bigint_iszero(n) && !bigint_iszero(m)) {
-        // DBG("\n:::: n=%s m=%s ans=%s", bigint_tostr(n, buf),
-        //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf + 0x200));
+        // DBG("\n:::: n=%s\n m=%s\n ans=%s", bigint_tostr(n, buf),
+        //     bigint_tostr(m, buf + 0x200), bigint_tostr(&ans, buf + 0x400));
         if (n->__arr[0] % 2 == 0 && m->__arr[0] % 2 == 0) {
             bigint_iadd(&ans, &ans);
-            // DBG("ans*=2 >> n=%s m=%s ans=%s", bigint_tostr(n, buf),
-            //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf +
-            //     0x200));
+            // DBG("ans*=2 >> n=%s\n m=%s\n ans=%s", bigint_tostr(n, buf),
+            //     bigint_tostr(m, buf + 0x200), bigint_tostr(&ans, buf +
+            //     0x400));
         }
         if (n->__arr[0] % 2 == 0) {
             bigint_idiv2(n);
-            // DBG("n/=2 >> n=%s m=%s ans=%s", bigint_tostr(n, buf),
-            //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf +
-            //     0x200));
+            // DBG("n/=2 >> n=%s\n m=%s\n ans=%s", bigint_tostr(n, buf),
+            //     bigint_tostr(m, buf + 0x200), bigint_tostr(&ans, buf +
+            //     0x400));
         }
         if (m->__arr[0] % 2 == 0) {
             bigint_idiv2(m);
-            // DBG("m/=2 >> n=%s m=%s ans=%s", bigint_tostr(n, buf),
-            //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf +
-            //     0x200));
+            // DBG("m/=2 >> n=%s\n m=%s\n ans=%s", bigint_tostr(n, buf),
+            //     bigint_tostr(m, buf + 0x200), bigint_tostr(&ans, buf +
+            //     0x400));
         }
         if (bigint_less_than(m, n)) {
             swap(n, m);
-            // DBG("swap >> n=%s m=%s ans=%s", bigint_tostr(n, buf),
-            //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf +
-            //     0x200));
+            // DBG("swap >> n=%s\n m=%s\n ans=%s", bigint_tostr(n, buf),
+            //     bigint_tostr(m, buf + 0x200), bigint_tostr(&ans, buf +
+            //     0x400));
         }
         bigint_isub(m, n);
-        // DBG("m-=n >> n=%s m=%s ans=%s", bigint_tostr(n, buf),
-        //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf + 0x200));
+        // DBG("m-=n >> n=%s\n m=%s\n ans=%s", bigint_tostr(n, buf),
+        //     bigint_tostr(m, buf + 0x200), bigint_tostr(&ans, buf + 0x400));
     }
     bigint_mul(n, &ans, z);
-    // DBG("n * ans >> n=%s m=%s ans=%s z=%s", bigint_tostr(n, buf),
-    //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf + 0x200),
-    //     bigint_tostr(z, buf + 0x300));
+    // DBG("n * ans >> n=%s\n m=%s\n ans=%s z=%s", bigint_tostr(n, buf),
+    //     bigint_tostr(m, buf + 0x200), bigint_tostr(&ans, buf + 0x400),
+    //     bigint_tostr(z, buf + 0x600));
     bigint_free(&a);
     bigint_free(&b);
     bigint_free(&ans);
