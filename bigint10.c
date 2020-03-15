@@ -7,68 +7,68 @@
 static inline void __bigint_inverse_array(BigInt* x)
 {
     x->neg = !x->neg;
-    for (size_t i = 0; i < x->n; i++)
-        x->a[i] = -x->a[i];
+    for (size_t i = 0; i < x->len; i++)
+        x->__arr[i] = -x->__arr[i];
 }
 
 static inline void __bigint_grow(BigInt* x)
 {
     x->cap *= 2;
-    x->a = realloc(x->a, x->cap * sizeof(x->a[0]));
+    x->__arr = realloc(x->__arr, x->cap * sizeof(x->__arr[0]));
 }
 
 static void __bigint_carry(BigInt* x)
 {
     // DBG("before carry : "); PRINT_BIGINT(x);
-    if (x->n == 0)
+    if (x->len == 0)
         return;
-    while (x->n > 1 && x->a[x->n - 1] == 0)
-        x->n--;
-    x->a[x->n] = 0;
-    for (size_t i = 0; i < x->n; i++) {
-        bool b = x->a[i] < 0 && x->a[i] % 10 != 0;
-        x->a[i + 1] += x->a[i] / 10 - b;
-        x->a[i] = x->a[i] % 10 + b * 10;
+    while (x->len > 1 && x->__arr[x->len - 1] == 0)
+        x->len--;
+    x->__arr[x->len] = 0;
+    for (size_t i = 0; i < x->len; i++) {
+        bool b = x->__arr[i] < 0 && x->__arr[i] % 10 != 0;
+        x->__arr[i + 1] += x->__arr[i] / 10 - b;
+        x->__arr[i] = x->__arr[i] % 10 + b * 10;
     }
-    if (x->a[x->n] != 0) {
-        x->n++;
-        if (x->n >= x->cap)
+    if (x->__arr[x->len] != 0) {
+        x->len++;
+        if (x->len >= x->cap)
             __bigint_grow(x);
     }
-    if (x->a[x->n - 1] < 0) {
+    if (x->__arr[x->len - 1] < 0) {
         __bigint_inverse_array(x);
         __bigint_carry(x);
     }
-    assert(x->a[x->n] >= 0);
-    while (x->n > 1 && x->a[x->n - 1] == 0)
-        x->n--;
-    if (x->n == 1 && x->a[0] == 0)
+    assert(x->__arr[x->len] >= 0);
+    while (x->len > 1 && x->__arr[x->len - 1] == 0)
+        x->len--;
+    if (x->len == 1 && x->__arr[0] == 0)
         x->neg = false;  // 0 is seen positive
     // DBG("after carry : "); PRINT_BIGINT(x);
 }
 
 void bigint_init(BigInt* x)
 {
-    if (!x->a) {
+    if (!x->__arr) {
         x->cap = BIGINT_INIT_CAPACITY;
-        x->a = malloc(x->cap * sizeof(signed char));
+        x->__arr = malloc(x->cap * sizeof(signed char));
     }
-    x->n = 0;
+    x->len = 0;
     x->neg = false;
 }
 
 void bigint_free(BigInt* x)
 {
-    if (x->a)
-        free(x->a);
+    if (x->__arr)
+        free(x->__arr);
 }
 
 BigInt* bigint_copy(BigInt* dest, const BigInt* src)
 {
     // TODO: dest don't have to be src->cap large, but rather src->n
-    dest->a = realloc(dest->a, src->cap * sizeof(src->a[0]));
-    memcpy(dest->a, src->a, src->n * sizeof(src->a[0]));
-    dest->n = src->n;
+    dest->__arr = realloc(dest->__arr, src->cap * sizeof(src->__arr[0]));
+    memcpy(dest->__arr, src->__arr, src->len * sizeof(src->__arr[0]));
+    dest->len = src->len;
     dest->cap = src->cap;
     dest->neg = src->neg;
     return dest;
@@ -77,17 +77,17 @@ BigInt* bigint_copy(BigInt* dest, const BigInt* src)
 static BigInt* __bigint_iadd(BigInt* x, const BigInt* y)
 {
     size_t i;
-    for (i = 0; i < x->n || i < y->n; i++) {
+    for (i = 0; i < x->len || i < y->len; i++) {
         if (i >= x->cap)
             __bigint_grow(x);
         assert(i < x->cap);
 
-        if (i < x->n && i < y->n)
-            x->a[i] += y->a[i];
-        else if (i < y->n)
-            x->a[i] = y->a[i];
+        if (i < x->len && i < y->len)
+            x->__arr[i] += y->__arr[i];
+        else if (i < y->len)
+            x->__arr[i] = y->__arr[i];
     }
-    x->n = i;
+    x->len = i;
     __bigint_carry(x);
     return x;
 }
@@ -95,17 +95,17 @@ static BigInt* __bigint_iadd(BigInt* x, const BigInt* y)
 static BigInt* __bigint_isub(BigInt* x, const BigInt* y)
 {
     size_t i;
-    for (i = 0; i < x->n || i < y->n; i++) {
+    for (i = 0; i < x->len || i < y->len; i++) {
         if (i >= x->cap)
             __bigint_grow(x);
         assert(i < x->cap);
 
-        if (i < x->n && i < y->n)
-            x->a[i] -= y->a[i];
-        else if (i < y->n)
-            x->a[i] = -y->a[i];
+        if (i < x->len && i < y->len)
+            x->__arr[i] -= y->__arr[i];
+        else if (i < y->len)
+            x->__arr[i] = -y->__arr[i];
     }
-    x->n = i;
+    x->len = i;
     __bigint_carry(x);
     return x;
 }
@@ -163,17 +163,17 @@ BigInt* bigint_mul(const BigInt* x, const BigInt* y, BigInt* z)
 {
     bigint_init(z);
     z->neg = x->neg ^ y->neg;
-    z->n = x->n + y->n + 1;
-    while (z->n >= z->cap)
+    z->len = x->len + y->len + 1;
+    while (z->len >= z->cap)
         __bigint_grow(z);
-    for (size_t i = 0; i < z->n; i++) {
-        z->a[i] = 0;
+    for (size_t i = 0; i < z->len; i++) {
+        z->__arr[i] = 0;
     }
-    for (size_t i = 0; i < x->n; i++) {
-        for (size_t j = 0; j < y->n; j++) {
-            signed char t = x->a[i] * y->a[j];
-            z->a[i + j] += t % 10;
-            z->a[i + j + 1] += t / 10;
+    for (size_t i = 0; i < x->len; i++) {
+        for (size_t j = 0; j < y->len; j++) {
+            signed char t = x->__arr[i] * y->__arr[j];
+            z->__arr[i + j] += t % 10;
+            z->__arr[i + j + 1] += t / 10;
         }
     }
     __bigint_carry(z);
@@ -182,13 +182,13 @@ BigInt* bigint_mul(const BigInt* x, const BigInt* y, BigInt* z)
 
 BigInt* bigint_idiv2(BigInt* x)
 {
-    if (x->n == 0)
+    if (x->len == 0)
         return x;
-    for (size_t i = x->n - 1; i > 0; i--) {
-        x->a[i - 1] += 10 * (x->a[i] % 2);
-        x->a[i] /= 2;
+    for (size_t i = x->len - 1; i > 0; i--) {
+        x->__arr[i - 1] += 10 * (x->__arr[i] % 2);
+        x->__arr[i] /= 2;
     }
-    x->a[0] /= 2;
+    x->__arr[0] /= 2;
     __bigint_carry(x);
     return x;
 }
@@ -199,12 +199,12 @@ BigInt* bigint_parsestr(const char* str, size_t len, BigInt* x)
     while (len > 0 && (str[len] < '0' || str[len] > '9'))
         len--;
     while (len > 0 && str[len] >= '0' && str[len] <= '9') {
-        x->a[x->n++] = str[len--] - '0';
-        if (x->n >= x->cap)
+        x->__arr[x->len++] = str[len--] - '0';
+        if (x->len >= x->cap)
             __bigint_grow(x);
     }
     if (len >= 0 && str[len] >= '0' && str[len] <= '9')
-        x->a[x->n++] = str[len--] - '0';
+        x->__arr[x->len++] = str[len--] - '0';
     if (len >= 0 && str[len] == '-')
         x->neg = true;
     return x;
@@ -213,13 +213,13 @@ BigInt* bigint_parsestr(const char* str, size_t len, BigInt* x)
 char* bigint_tostr(const BigInt* x, char* str)
 {
     char* s = str;
-    if (x->n > 0) {
+    if (x->len > 0) {
         if (x->neg)
             *s++ = '-';
-        for (size_t i = x->n - 1; i > 0; i--) {
-            *s++ = '0' + x->a[i];
+        for (size_t i = x->len - 1; i > 0; i--) {
+            *s++ = '0' + x->__arr[i];
         }
-        *s++ = '0' + x->a[0];
+        *s++ = '0' + x->__arr[0];
     }
     *s = '\0';
     return str;
@@ -228,20 +228,20 @@ char* bigint_tostr(const BigInt* x, char* str)
 /* empty is also zero */
 bool bigint_iszero(const BigInt* x)
 {
-    for (size_t i = 0; i < x->n; i++)
-        if (x->a[i] != 0)
+    for (size_t i = 0; i < x->len; i++)
+        if (x->__arr[i] != 0)
             return false;
     return true;
 }
 
 bool bigint_less_than(const BigInt* x, const BigInt* y)
 {
-    if (x->n != y->n)
-        return x->n < y->n;
-    for (size_t i = x->n - 1; i > 0; i--)
-        if (x->a[i] != y->a[i])
-            return x->a[i] < y->a[i];
-    return x->a[0] < y->a[0];
+    if (x->len != y->len)
+        return x->len < y->len;
+    for (size_t i = x->len - 1; i > 0; i--)
+        if (x->__arr[i] != y->__arr[i])
+            return x->__arr[i] < y->__arr[i];
+    return x->__arr[0] < y->__arr[0];
 }
 
 BigInt* bigint_gcd(const BigInt* x, const BigInt* y, BigInt* z)
@@ -251,8 +251,8 @@ BigInt* bigint_gcd(const BigInt* x, const BigInt* y, BigInt* z)
     BIGINT(ans);
     bigint_copy(&a, x);
     bigint_copy(&b, y);
-    ans.a[0] = 1;
-    ans.n = 1;
+    ans.__arr[0] = 1;
+    ans.len = 1;
 
     BigInt *n, *m;
 
@@ -266,25 +266,29 @@ BigInt* bigint_gcd(const BigInt* x, const BigInt* y, BigInt* z)
     while (!bigint_iszero(n) && !bigint_iszero(m)) {
         // DBG("\n:::: n=%s m=%s ans=%s", bigint_tostr(n, buf),
         //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf + 0x200));
-        if (n->a[0] % 2 == 0 && m->a[0] % 2 == 0) {
+        if (n->__arr[0] % 2 == 0 && m->__arr[0] % 2 == 0) {
             bigint_iadd(&ans, &ans);
             // DBG("ans*=2 >> n=%s m=%s ans=%s", bigint_tostr(n, buf),
-            //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf + 0x200));
+            //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf +
+            //     0x200));
         }
-        if (n->a[0] % 2 == 0) {
+        if (n->__arr[0] % 2 == 0) {
             bigint_idiv2(n);
             // DBG("n/=2 >> n=%s m=%s ans=%s", bigint_tostr(n, buf),
-            //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf + 0x200));
+            //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf +
+            //     0x200));
         }
-        if (m->a[0] % 2 == 0) {
+        if (m->__arr[0] % 2 == 0) {
             bigint_idiv2(m);
             // DBG("m/=2 >> n=%s m=%s ans=%s", bigint_tostr(n, buf),
-            //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf + 0x200));
+            //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf +
+            //     0x200));
         }
         if (bigint_less_than(m, n)) {
             swap(n, m);
             // DBG("swap >> n=%s m=%s ans=%s", bigint_tostr(n, buf),
-            //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf + 0x200));
+            //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf +
+            //     0x200));
         }
         bigint_isub(m, n);
         // DBG("m-=n >> n=%s m=%s ans=%s", bigint_tostr(n, buf),

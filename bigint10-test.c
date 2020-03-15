@@ -4,9 +4,11 @@
 
 static char buf[0x500];
 
-static gcd(long long a, long long b) {
-    if (b == 0) return a;
-    return gcd(b, a%b);
+static gcd(long long a, long long b)
+{
+    if (b == 0)
+        return a;
+    return gcd(b, a % b);
 }
 
 int main()
@@ -27,22 +29,22 @@ int main()
         bigint_add(&x, &y, &z);
         bigint_tostr(&z, buf);
         c = atoi(buf);
-        DBG("a=%26d b=%26d bigint(a+b)=%26s;%26d a+b=%26d", a, b, buf, c,
-            a + b);
+        printf("a=%26d b=%26d bigint(a+b)=%26s;%26d a+b=%26d\n", a, b, buf, c,
+               a + b);
         assert(c == a + b);
 
         bigint_sub(&x, &y, &z);
         bigint_tostr(&z, buf);
         c = atoi(buf);
-        DBG("a=%26d b=%26d bigint(a-b)=%26s;%26d a-b=%26d", a, b, buf, c,
-            a - b);
+        printf("a=%26d b=%26d bigint(a-b)=%26s;%26d a-b=%26d\n", a, b, buf, c,
+               a - b);
         assert(c == a - b);
 
         bigint_mul(&x, &y, &z);
         bigint_tostr(&z, buf);
         c = strtoll(buf, NULL, 10);
-        DBG("a=%26d b=%26d bigint(a*b)=%26s;%26lld a*b=%26lld", a, b, buf, c,
-            a * b);
+        printf("a=%26d b=%26d bigint(a*b)=%26s;%26lld a*b=%26lld\n", a, b, buf,
+               c, a * b);
         assert(c == a * b);
 
         a = abs(a);
@@ -51,9 +53,9 @@ int main()
         bigint_gcd(&x, &y, &z);
         bigint_tostr(&z, buf);
         c = strtoll(buf, NULL, 10);
-        DBG("a=%26d b=%26d bigint(gcd)=%26s;%26lld a*b=%26lld", a, b, buf, c,
-            gcd(a, b));
-        assert(c == gcd(a,b));
+        printf("a=%26d b=%26d bigint(gcd)=%26s;%26lld gcd=%26lld\n", a, b, buf,
+               c, gcd(a, b));
+        assert(c == gcd(a, b));
     }
     bigint_free(&x);
     bigint_free(&y);

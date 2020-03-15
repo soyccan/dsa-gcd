@@ -3,15 +3,15 @@
 #define BIGINT_INIT_CAPACITY 0x8
 
 typedef struct {
-    signed char* a;
-    size_t n;
-    size_t cap;
-    bool neg;
+    signed char* __arr;
+    size_t len;
+    size_t cap;  // capacity
+    bool neg;    // negative
 } BigInt;
 
-#define BIGINT(name)                                                      \
-    BigInt name = {malloc(BIGINT_INIT_CAPACITY * sizeof(signed char)), 0, \
-                   BIGINT_INIT_CAPACITY, false};
+#define BIGINT(name)                                      \
+    BigInt name = {NULL, 0, BIGINT_INIT_CAPACITY, false}; \
+    bigint_init(&(name));
 
 #ifndef NDEBUG
 #define PRINT_BIGINT(x)                     \
@@ -44,6 +44,4 @@ char* bigint_tostr(const BigInt* x, char* str);
 bool bigint_iszero(const BigInt* x);
 bool bigint_less_than(const BigInt* x, const BigInt* y);
 
-BigInt* bigint_gcd(const BigInt* x,
-                   const BigInt* y,
-                   BigInt* z);
+BigInt* bigint_gcd(const BigInt* x, const BigInt* y, BigInt* z);
