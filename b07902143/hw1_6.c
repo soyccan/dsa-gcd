@@ -326,12 +326,12 @@ BigInt* bigint_parsestr(const char* str, size_t len, BigInt* x)
             __bigint_grow(x);
         x->__arr[x->len++] = str[len--] - '0';
     }
-    if (len >= 0 && str[len] >= '0' && str[len] <= '9') {
+    if (str[len] >= '0' && str[len] <= '9') {
         if (x->len >= x->cap)
             __bigint_grow(x);
-        x->__arr[x->len++] = str[len--] - '0';
+        x->__arr[x->len++] = str[len] - '0';
     }
-    if (len >= 0 && str[len] == '-')
+    if (str[len] == '-')
         x->neg = true;
     return x;
 }
