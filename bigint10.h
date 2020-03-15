@@ -14,12 +14,12 @@ typedef struct {
     bigint_init(&(name));
 
 #ifndef NDEBUG
-#define PRINT_BIGINT(x)                     \
-    {                                       \
+#define PRINT_BIGINT(x)                              \
+    {                                                \
         fprintf(stderr, "neg %d; ", (x)->neg);       \
-        for (size_t i = 0; i < (x)->len; i++) \
-            fprintf(stderr, "%hhd ", (x)->__arr[i]);     \
-        fprintf(stderr,"\n");                           \
+        for (size_t i = 0; i < (x)->len; i++)        \
+            fprintf(stderr, "%hhd ", (x)->__arr[i]); \
+        fprintf(stderr, "\n");                       \
     }
 #else
 #define PRINT_BIGINT(...)

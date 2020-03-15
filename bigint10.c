@@ -24,9 +24,9 @@ static void __bigint_carry(BigInt* x)
         return;
     while (x->len > 1 && x->__arr[x->len - 1] == 0)
         x->len--;
-    if (x->len >= x->cap) // we must reserve an extra entry for...
-        __bigint_grow(x); // ...
-    x->__arr[x->len] = 0; // this line to use.
+    if (x->len >= x->cap)  // we must reserve an extra entry for...
+        __bigint_grow(x);  // ...
+    x->__arr[x->len] = 0;  // this line to use.
     for (size_t i = 0; i < x->len; i++) {
         bool b = x->__arr[i] < 0 && x->__arr[i] % 10 != 0;
         x->__arr[i + 1] += x->__arr[i] / 10 - b;
@@ -174,7 +174,7 @@ BigInt* bigint_mul(const BigInt* x, const BigInt* y, BigInt* z)
             // TODO: will this overflow ?
             int t = z->__arr[i + j] + x->__arr[i] * y->__arr[j];
             z->__arr[i + j] = t % 10;
-            assert(z->__arr[i+j+1] <= 127 - t / 10);
+            assert(z->__arr[i + j + 1] <= 127 - t / 10);
             z->__arr[i + j + 1] += t / 10;
         }
     }
@@ -205,12 +205,12 @@ BigInt* bigint_parsestr(const char* str, size_t len, BigInt* x)
             __bigint_grow(x);
         x->__arr[x->len++] = str[len--] - '0';
     }
-    if (len >= 0 && str[len] >= '0' && str[len] <= '9') {
+    if (str[len] >= '0' && str[len] <= '9') {
         if (x->len >= x->cap)
             __bigint_grow(x);
-        x->__arr[x->len++] = str[len--] - '0';
+        x->__arr[x->len++] = str[len] - '0';
     }
-    if (len >= 0 && str[len] == '-')
+    if (str[len] == '-')
         x->neg = true;
     return x;
 }
