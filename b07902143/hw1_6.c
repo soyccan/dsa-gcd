@@ -135,7 +135,7 @@ static inline void __bigint_inverse_array(BigInt* x)
 static inline void __bigint_grow(BigInt* x)
 {
     x->cap *= 2;
-    x->__arr = realloc(x->__arr, x->cap * sizeof(x->__arr[0]));
+    x->__arr = (signed char*)realloc(x->__arr, x->cap * sizeof(x->__arr[0]));
 }
 
 static void __bigint_carry(BigInt* x)
