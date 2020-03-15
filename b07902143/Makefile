@@ -1,4 +1,13 @@
-all: hw1_5 hw1_6
-
+source = hw1_5 hw1_6
+all: $(source)
+$(source):
 %: %.c
-	gcc -O3 -o $@ $^
+	g++ -O2 -std=c11 $< -o $@
+%: %.cpp
+	g++ -O2 -std=c++14 $< -o $@
+clean:
+	rm -rf $(source)
+run5:
+	./hw1_5 < input
+run6:
+	./hw1_6 < input

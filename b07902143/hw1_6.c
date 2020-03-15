@@ -172,7 +172,7 @@ void bigint_init(BigInt* x)
 {
     if (!x->__arr) {
         x->cap = BIGINT_INIT_CAPACITY;
-        x->__arr = malloc(x->cap * sizeof(signed char));
+        x->__arr = (signed char*)malloc(x->cap * sizeof(signed char));
     }
     x->len = 0;
     x->neg = false;
@@ -187,7 +187,7 @@ void bigint_free(BigInt* x)
 BigInt* bigint_copy(BigInt* dest, const BigInt* src)
 {
     // TODO: dest don't have to be src->cap large, but rather src->n
-    dest->__arr = realloc(dest->__arr, src->cap * sizeof(src->__arr[0]));
+    dest->__arr = (signed char*)realloc(dest->__arr, src->cap * sizeof(src->__arr[0]));
     memcpy(dest->__arr, src->__arr, src->len * sizeof(src->__arr[0]));
     dest->len = src->len;
     dest->cap = src->cap;
@@ -411,7 +411,9 @@ BigInt* bigint_gcd(const BigInt* x, const BigInt* y, BigInt* z)
             //     0x400));
         }
         if (bigint_less_than(m, n)) {
-            swap(n, m);
+            BigInt* t = n;
+            n = m;
+            m = t;
             // DBG("swap >> n=%s\n m=%s\n ans=%s", bigint_tostr(n, buf),
             //     bigint_tostr(m, buf + 0x200), bigint_tostr(&ans, buf +
             //     0x400));

@@ -119,7 +119,9 @@ int gcd_by_binary(int a, int b, int* iter_count)
             m /= 2;
         }
         if (n > m) {
-            swap(n, m);
+            int t = n;
+            n = m;
+            m = t;
         }
         m -= n;
     }
