@@ -19,10 +19,9 @@ def gcd_binary(n, m):
 
 inf = open("hw1_6.in", 'w')
 ouf = open('hw1_6.out', 'w')
-for _ in range(1):
-    g = random.randint(10**228, 10**229)
+for _ in range(10000):
+    g = random.randint(10**228, 10**230)
     a = random.randint(10**26, 10**27)
     b = random.randint(10**26, 10**27)
     print(g*a,g*b,file=inf)
     print(math.gcd(g*a,g*b), file=ouf)
-    gcd_binary(g*a, g*b)

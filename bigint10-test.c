@@ -14,13 +14,13 @@ static gcd(long long a, long long b)
 int main()
 {
     srand(time(0));
-    long long i = 100000, a, b, c, n;
+    long long i = 1, a, b, c, n;
     BIGINT(x);
     BIGINT(y);
     BIGINT(z);
     while (i--) {
-        a = rand() % 2000000000 - 1000000000;
-        b = rand() % 2000000000 - 1000000000;
+        a = rand() % 100000 + 100000;
+        b = rand() % 100000 + 100000;
         sprintf(buf, "%d", a);
         bigint_parsestr(buf, strlen(buf), &x);
         sprintf(buf, "%d", b);

@@ -1,142 +1,330 @@
-#include <stdint.h>
+#include "bigint.h"
 
 #include "soyccan.h"
 
-#define BIGINT_INIT_SIZE 0x100
+static char buf[0x500];
 
-typedef struct {
-    uint64_t* __arr;
-    size_t __len;
-} BigInt;
-
-void bigint_init(BigInt* a)
+static inline void __bigint_inverse_array(BigInt* x)
 {
-    a->__len = BIGINT_INIT_SIZE;
-    a->__arr = malloc(BIGINT_INIT_SIZE * sizeof(a->__arr[0]));
+    x->neg = !x->neg;
+    for (size_t i = 0; i < x->len; i++)
+        x->__arr[i] = -x->__arr[i];
 }
 
-void bigint_grow(BigInt* a)
+static inline void __bigint_grow(BigInt* x)
 {
-    a->__len *= 2;
-    a->__arr = realloc(a->__arr, a->__len * sizeof(a->__arr[0]));
+    x->cap *= 2;
+    x->__arr = realloc(x->__arr, x->cap * sizeof(x->__arr[0]));
 }
 
-void bigint_add(const BigInt* a, const BigInt* b, BigInt* c)
+static void __bigint_carry(BigInt* x)
 {
-    if (!c->__arr) {
-        bigint_init(c);
+    // DBG("before carry : "); PRINT_BIGINT(x);
+    if (x->len == 0)
+        return;
+    while (x->len > 1 && x->__arr[x->len - 1] == 0)
+        x->len--;
+    x->__arr[x->len] = 0;
+    for (size_t i = 0; i < x->len; i++) {
+        bool b = x->__arr[i] < 0 && x->__arr[i] % 10 != 0;
+        x->__arr[i + 1] += x->__arr[i] / 10 - b;
+        x->__arr[i] = x->__arr[i] % 10 + b * 10;
     }
-    uint64_t* x = a->__arr;
-    uint64_t* y = b->__arr;
-    size_t idx = 0;
-    while (*x || *y) {
-        c->__arr[idx] = *x + *y;
-        idx++;
-        if (idx > c->__len)
-            bigint_grow(c);
-        if (*x)
-            x++;
-        if (*y)
-            y++;
+    if (x->__arr[x->len] != 0) {
+        x->len++;
+        if (x->len >= x->cap)
+            __bigint_grow(x);
     }
+    if (x->__arr[x->len - 1] < 0) {
+        __bigint_inverse_array(x);
+        __bigint_carry(x);
+    }
+    assert(x->__arr[x->len] >= 0);
+    while (x->len > 1 && x->__arr[x->len - 1] == 0)
+        x->len--;
+    if (x->len == 1 && x->__arr[0] == 0)
+        x->neg = false;  // 0 is seen positive
+    // DBG("after carry : "); PRINT_BIGINT(x);
 }
 
-void bigint_parsestr(const char* str, BigInt* a)
+void bigint_init(BigInt* x)
 {
-    uint64_t x = 0;
-    size_t idx = 0;
-    while (*str && (*str < '0' || *str > '9'))
-        str++;
-    while (*str && *str >= '0' && *str <= '9') {
+    if (!x->__arr) {
+        x->cap = BIGINT_INIT_CAPACITY;
+        x->__arr = malloc(x->cap * sizeof(signed char));
+    }
+    x->len = 0;
+    x->neg = false;
+}
+
+void bigint_free(BigInt* x)
+{
+    if (x->__arr)
+        free(x->__arr);
+}
+
+BigInt* bigint_copy(BigInt* dest, const BigInt* src)
+{
+    // TODO: dest don't have to be src->cap large, but rather src->n
+    dest->__arr = realloc(dest->__arr, src->cap * sizeof(src->__arr[0]));
+    memcpy(dest->__arr, src->__arr, src->len * sizeof(src->__arr[0]));
+    dest->len = src->len;
+    dest->cap = src->cap;
+    dest->neg = src->neg;
+    return dest;
+}
+
+static BigInt* __bigint_iadd(BigInt* x, const BigInt* y)
+{
+    size_t i;
+    for (i = 0; i < x->len || i < y->len; i++) {
+        if (i >= x->cap)
+            __bigint_grow(x);
+        assert(i < x->cap);
+
+        if (i < x->len && i < y->len)
+            x->__arr[i] += y->__arr[i];
+        else if (i < y->len)
+            x->__arr[i] = y->__arr[i];
+    }
+    x->len = i;
+    __bigint_carry(x);
+    return x;
+}
+
+static BigInt* __bigint_isub(BigInt* x, const BigInt* y)
+{
+    size_t i;
+    for (i = 0; i < x->len || i < y->len; i++) {
+        if (i >= x->cap)
+            __bigint_grow(x);
+        assert(i < x->cap);
+
+        if (i < x->len && i < y->len)
+            x->__arr[i] -= y->__arr[i];
+        else if (i < y->len)
+            x->__arr[i] = -y->__arr[i];
+    }
+    x->len = i;
+    __bigint_carry(x);
+    return x;
+}
+
+BigInt* bigint_iadd(BigInt* x, const BigInt* y)
+{
+    if (!x->neg && !y->neg)
+        return __bigint_iadd(x, y);
+    else if (!x->neg && y->neg)
+        return __bigint_isub(x, y);
+    else if (x->neg && !y->neg)
+        return __bigint_isub(x, y);
+    else
+        return __bigint_iadd(x, y);
+}
+
+BigInt* bigint_isub(BigInt* x, const BigInt* y)
+{
+    if (!x->neg && !y->neg)
+        return __bigint_isub(x, y);
+    else if (!x->neg && y->neg)
+        return __bigint_iadd(x, y);
+    else if (x->neg && !y->neg)
+        return __bigint_iadd(x, y);
+    else
+        return __bigint_isub(x, y);
+}
+
+BigInt* bigint_imul(BigInt* x, const BigInt* y)
+{
+    BIGINT(z);
+    bigint_mul(x, y, &z);
+    bigint_copy(x, &z);
+    bigint_free(&z);
+    return x;
+}
+
+BigInt* bigint_add(const BigInt* x, const BigInt* y, BigInt* z)
+{
+    bigint_init(z);
+    bigint_copy(z, x);
+    bigint_iadd(z, y);
+    return z;
+}
+
+BigInt* bigint_sub(const BigInt* x, const BigInt* y, BigInt* z)
+{
+    bigint_init(z);
+    bigint_copy(z, x);
+    bigint_isub(z, y);
+    return z;
+}
+
+BigInt* bigint_mul(const BigInt* x, const BigInt* y, BigInt* z)
+{
+    bigint_init(z);
+    z->neg = x->neg ^ y->neg;
+    z->len = x->len + y->len + 1;
+    while (z->len >= z->cap)
+        __bigint_grow(z);
+    for (size_t i = 0; i < z->len; i++) {
+        z->__arr[i] = 0;
+    }
+    for (size_t i = 0; i < x->len; i++) {
+        for (size_t j = 0; j < y->len; j++) {
+            signed char t = x->__arr[i] * y->__arr[j];
+            z->__arr[i + j] += t % 10;
+            z->__arr[i + j + 1] += t / 10;
+        }
+    }
+    __bigint_carry(z);
+    return z;
+}
+
+BigInt* bigint_idiv2(BigInt* x)
+{
+    if (x->len == 0)
+        return x;
+    for (size_t i = x->len - 1; i > 0; i--) {
+        x->__arr[i - 1] += 10 * (x->__arr[i] % 2);
+        x->__arr[i] /= 2;
+    }
+    x->__arr[0] /= 2;
+    __bigint_carry(x);
+    return x;
+}
+
+BigInt* bigint_parsestr(const char* str, size_t len, BigInt* x)
+{
+    bigint_init(x);
+    while (len > 0 && (str[len] < '0' || str[len] > '9'))
+        len--;
+    while (len > 0 && str[len] >= '0' && str[len] <= '9') {
+        x->__arr[x->len++] = str[len--] - '0';
+        if (x->len >= x->cap)
+            __bigint_grow(x);
+    }
+    if (len >= 0 && str[len] >= '0' && str[len] <= '9')
+        x->__arr[x->len++] = str[len--] - '0';
+    if (len >= 0 && str[len] == '-')
+        x->neg = true;
+    return x;
+
+
+    bigint_init(x);
+    uint64_t t = 0, base = 1;
+    size_t idx = 0;  // TODO: log(10^(len-1)) / log(2^64);
+    while (len > 0 && (str[len] < '0' || str[len] > '9'))
+        len--;
+    while (len > 0 && str[len] >= '0' && str[len] <= '9') {
         uint64_t overflow =
-            ((x >> 60) + (x >> 62) +
-             (((x << 3 & 0x7fffffffffffffff) + (x << 1 & 0x7fffffffffffffff)) >>
+            ((t >> 60) + (t >> 62) +
+             (((t << 3 & 0x7fffffffffffffff) + (t << 1 & 0x7fffffffffffffff)) >>
               63)) >>
             1;
-        uint64_t remainder = *str - '0' + x * 10;
+        uint64_t remainder = *str - '0' + t * 10;
         if (overflow) {
-            a->__arr[idx++] = remainder;
-            x = overflow;
+            x->__arr[idx--] = overflow;
+            t = remainder;
         } else {
-            x = remainder;
+            t = remainder;
         }
-        str++;
+
+        base *= 10;
+        if (x->len >= x->cap)
+            __bigint_grow(x);
     }
 }
 
-void bigint_tostr(const BigInt* a, char* str)
+char* bigint_tostr(const BigInt* x, char* str)
 {
-    while () {
-        *str = '0' + a->__arr[idx] % 10;
-        str++;
+    char* s = str;
+    if (x->len > 0) {
+        if (x->neg)
+            *s++ = '-';
+        for (size_t i = x->len - 1; i > 0; i--) {
+            *s++ = '0' + x->__arr[i];
+        }
+        *s++ = '0' + x->__arr[0];
     }
+    *s = '\0';
+    return str;
 }
 
-BigInt* gcd_by_binary(const BigInt* a,
-                      const BigInt* b,
-                      BigInt* gcd,
-                      int* iter_count)
+/* empty is also zero */
+bool bigint_iszero(const BigInt* x)
 {
-    int n = min(a, b);
-    int m = max(a, b);
-    int ans = 1;
-    while (n != 0 && m != 0) {
-        (*iter_count)++;
-        if (n % 2 == 0 && m % 2 == 0) {
-            ans *= 2;
+    for (size_t i = 0; i < x->len; i++)
+        if (x->__arr[i] != 0)
+            return false;
+    return true;
+}
+
+bool bigint_less_than(const BigInt* x, const BigInt* y)
+{
+    if (x->len != y->len)
+        return x->len < y->len;
+    for (size_t i = x->len - 1; i > 0; i--)
+        if (x->__arr[i] != y->__arr[i])
+            return x->__arr[i] < y->__arr[i];
+    return x->__arr[0] < y->__arr[0];
+}
+
+BigInt* bigint_gcd(const BigInt* x, const BigInt* y, BigInt* z)
+{
+    BIGINT(a);
+    BIGINT(b);
+    BIGINT(ans);
+    bigint_copy(&a, x);
+    bigint_copy(&b, y);
+    ans.__arr[0] = 1;
+    ans.len = 1;
+
+    BigInt *n, *m;
+
+    if (bigint_less_than(&a, &b)) {
+        n = &a;
+        m = &b;
+    } else {
+        n = &b;
+        m = &a;
+    }
+    while (!bigint_iszero(n) && !bigint_iszero(m)) {
+        // DBG("\n:::: n=%s m=%s ans=%s", bigint_tostr(n, buf),
+        //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf + 0x200));
+        if (n->__arr[0] % 2 == 0 && m->__arr[0] % 2 == 0) {
+            bigint_iadd(&ans, &ans);
+            // DBG("ans*=2 >> n=%s m=%s ans=%s", bigint_tostr(n, buf),
+            //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf +
+            //     0x200));
         }
-        if (n % 2 == 0) {
-            n /= 2;
+        if (n->__arr[0] % 2 == 0) {
+            bigint_idiv2(n);
+            // DBG("n/=2 >> n=%s m=%s ans=%s", bigint_tostr(n, buf),
+            //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf +
+            //     0x200));
         }
-        if (m % 2 == 0) {
-            m /= 2;
+        if (m->__arr[0] % 2 == 0) {
+            bigint_idiv2(m);
+            // DBG("m/=2 >> n=%s m=%s ans=%s", bigint_tostr(n, buf),
+            //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf +
+            //     0x200));
         }
-        if (n > m) {
+        if (bigint_less_than(m, n)) {
             swap(n, m);
+            // DBG("swap >> n=%s m=%s ans=%s", bigint_tostr(n, buf),
+            //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf +
+            //     0x200));
         }
-        m -= n;
+        bigint_isub(m, n);
+        // DBG("m-=n >> n=%s m=%s ans=%s", bigint_tostr(n, buf),
+        //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf + 0x200));
     }
-    return n * ans;
-}
-
-static void test_add() {}
-
-static void __test()
-{
-    srand(time(0));
-    FOR(i, 0, 1000)
-    {
-        int a = rand() % 1000000 + 1;
-        int b = rand() % 1000000 + 1;
-        printf("test round %d, a=%d b=%d\n", i, a, b);
-        int _;
-        int r[4];
-        r[0] = gcd_by_def(a, b, &_);
-        r[1] = gcd_by_reverse_search(a, b, &_);
-        r[2] = gcd_by_binary(a, b, &_);
-        r[3] = gcd_by_euclid(a, b, &_);
-        FOR(i, 1, 4) assert(r[i] == r[i - 1]);
-    }
-}
-
-int main()
-{
-    int a, b, iter_count;
-    while (scanf("%d", &a) == 1 && a > 0) {
-        scanf("%d", &b);
-        iter_count = 0;
-        printf("(Case %d, %d): GCD-By-Def = %d, taking %d iterations\n", a, b,
-               gcd_by_def(a, b, &iter_count), iter_count);
-        iter_count = 0;
-        printf(
-            "(Case %d, %d): GCD-By-Reverse-Search = %d, taking %d iterations\n",
-            a, b, gcd_by_reverse_search(a, b, &iter_count), iter_count);
-        iter_count = 0;
-        printf("(Case %d, %d): GCD-By-Binary = %d, taking %d iterations\n", a,
-               b, gcd_by_binary(a, b, &iter_count), iter_count);
-        iter_count = 0;
-        printf("(Case %d, %d): GCD-By-Euclid = %d, taking %d iterations\n", a,
-               b, gcd_by_euclid(a, b, &iter_count), iter_count);
-    }
-    return 0;
+    bigint_mul(n, &ans, z);
+    // DBG("n * ans >> n=%s m=%s ans=%s z=%s", bigint_tostr(n, buf),
+    //     bigint_tostr(m, buf + 0x100), bigint_tostr(&ans, buf + 0x200),
+    //     bigint_tostr(z, buf + 0x300));
+    bigint_free(&a);
+    bigint_free(&b);
+    bigint_free(&ans);
+    return z;
 }

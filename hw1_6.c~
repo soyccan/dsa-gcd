@@ -1,0 +1,246 @@
+#include "soyccan.h"
+
+#define BIGINT_INIT_LEN 100
+
+typedef struct {
+    signed char a[BIGINT_INIT_CAPACITY];
+    size_t n;
+} BigInt;
+
+char line[BIGINT_INIT_CAPACITY];
+
+static void __printarr(const BigInt* x)
+{
+    for (size_t i = 0; i < x->n; i++)
+        printf("%3d", x->a[i]);
+    puts("");
+}
+
+/* make sure the trailing of the array are zero-ed */
+static void __bigint_carry(BigInt* x)
+{
+    if (x->n == 0)
+        return;
+    for (size_t i = 0; i < x->n; i++) {
+        // if (i == x->n - 1 && x->a[i] >= 10)
+        //     x->n++; // Note: danger, loop may run forever
+        if (i == x->n - 1)
+            x->a[i + 1] = x->a[i] / 10;
+        else
+            x->a[i + 1] += x->a[i] / 10;
+        x->a[i] %= 10;
+        if (x->a[i] < 0) {
+            x->a[i + 1]--;
+            x->a[i] += 10;
+        }
+    }
+    while (x->a[x->n] == 0)
+        x->n--;
+    if (x->n == 0)
+        x->n = 1;
+}
+
+void bigint_init(BigInt* x)
+{
+    x->n = 0;
+}
+
+/* z MUST in different memory as x or y */
+BigInt* bigint_add(const BigInt* x, const BigInt* y, BigInt* z)
+{
+    bigint_init(z);
+    size_t i = 0, j = 0;
+    while (i < x->n || j < y->n) {
+        z->a[z->n] = 0;
+        if (i < x->n)
+            z->a[z->n] += x->a[i++];
+        if (j < y->n)
+            z->a[z->n] += y->a[j++];
+        z->n++;
+    }
+    __bigint_carry(z);
+    if (z->a[z->n] > 0)
+        z->a[z->n]++;
+    return z;
+}
+
+BigInt* bigint_iadd(BigInt* x, const BigInt* y)
+{
+    printf("x: ");
+    __printarr(x);
+    printf("y: ");
+    __printarr(y);
+    BigInt z;
+    bigint_add(x, y, &z);
+    memcpy(x, &z, sizeof z);
+    return x;
+}
+
+/* do NOT handle x < y */
+/* z MUST in different memory as x or y */
+BigInt* bigint_sub(const BigInt* x, const BigInt* y, BigInt* z)
+{
+    bigint_init(z);
+    size_t i = 0, j = 0;
+    while (i < x->n || j < y->n) {
+        z->a[z->n] = x->a[i++];
+        if (j < y->n)
+            z->a[z->n] -= y->a[j++];
+        z->n++;
+    }
+    z->a[z->n] = 0;
+    __bigint_carry(z);
+    return z;
+}
+
+BigInt* bigint_isub(BigInt* x, const BigInt* y)
+{
+    BigInt z;
+    bigint_sub(x, y, &z);
+    memcpy(x, &z, sizeof z);
+    return x;
+}
+
+void bigint_idiv2(BigInt* x)
+{
+    if (x->n == 0)
+        return;
+    for (size_t i = x->n - 1; i > 0; i--) {
+        x->a[i - 1] += 10 * (x->a[i] % 2);
+        x->a[i] /= 2;
+    }
+    x->a[0] /= 2;
+    __bigint_carry(x);
+}
+
+bool bigint_less_than(const BigInt* x, const BigInt* y)
+{
+    if (x->n != y->n)
+        return x->n < y->n;
+    for (size_t i = x->n; i > 0; i--)
+        if (x->a[i] != y->a[i])
+            return x->a[i] < y->a[i];
+    return x->a[0] < y->a[0];
+}
+
+bool bigint_iszero(const BigInt* x)
+{
+    for (size_t i = 0; i < x->n; i++)
+        if (x->a[i] != 0)
+            return false;
+    return true;
+}
+
+BigInt* bigint_parsestr(const char* str, size_t len, BigInt* x)
+{
+    bigint_init(x);
+    while (len > 0 && (str[len] < '0' || str[len] > '9'))
+        len--;
+    while (len > 0 && str[len] >= '0' && str[len] <= '9') {
+        x->a[x->n++] = str[len--] - '0';
+    }
+    if (str[len] >= '0' && str[len] <= '9')
+        x->a[x->n++] = str[0] - '0';
+    return x;
+}
+
+char* bigint_tostr(const BigInt* x, char* str)
+{
+    char* _str = str;
+    if (x->n > 0) {
+        size_t i = x->n - 1;
+        while (i > 0 && x->a[i] == 0)
+            i--;
+        while (i > 0) {
+            *str++ = '0' + x->a[i];
+            i--;
+        }
+        *str++ = '0' + x->a[0];
+    }
+    *str = '\0';
+    return _str;
+}
+
+BigInt* gcd_by_binary(const BigInt* a,
+                      const BigInt* b,
+                      BigInt* c,
+                      int* iter_count)
+{
+    BigInt ans, tmp;
+    bigint_init(&ans);
+    bigint_init(&tmp);
+    ans.a[0] = 1;
+    ans.n = 1;
+
+    BigInt *n, *m;
+
+    if (bigint_less_than(a, b)) {
+        n = a;
+        m = b;
+    } else {
+        n = b;
+        m = a;
+    }
+    while (!bigint_iszero(n) && !bigint_iszero(m)) {
+        (*iter_count)++;
+        if (n->a[0] % 2 == 0 && m->a[0] % 2 == 0) {
+            printf("ans : %s\n", bigint_tostr(&ans, line));
+            bigint_iadd(&ans, &ans);
+            printf("ans *= 2 : %s\n", bigint_tostr(&ans, line));
+        }
+        if (n->a[0] % 2 == 0) {
+            printf("n : %s\n", bigint_tostr(n, line));
+            bigint_idiv2(n);
+            printf("n /= 2 : %s\n", bigint_tostr(n, line));
+        }
+        if (m->a[0] % 2 == 0) {
+            printf("m : %s\n", bigint_tostr(m, line));
+            bigint_idiv2(m);
+            printf("m /= 2 : %s\n", bigint_tostr(m, line));
+        }
+        if (bigint_less_than(m, n)) {
+            printf("swap m : %s n:%s\n", bigint_tostr(m, line),
+                   bigint_tostr(n, line));
+            swap(n, m);
+        }
+        printf("sub m : %s\n", bigint_tostr(m, line));
+        printf("sub n: %s \n", bigint_tostr(n, line));
+        bigint_isub(m, n);
+        printf(" m -= n: %s\n", bigint_tostr(m, line));
+    }
+    printf("end m:%s ", bigint_tostr(m, line));
+    printf(" n:%s \n", bigint_tostr(n, line));
+    bigint_init(c);
+    for (size_t i = 0; i < n; i++)
+        bigint_iadd(c, &ans);
+    return c;
+}
+
+int main()
+{
+    char *a, *b;
+    ssize_t an, bn, count;
+    BigInt x, y, z;
+    bigint_init(&x);
+    bigint_init(&y);
+    bigint_init(&z);
+    while (fgets(line, BIGINT_INIT_CAPACITY, stdin)) {
+        a = b = line;
+        a = strsep(&b, " ");
+        printf("a = %s; b = %s\n", a, b);
+        bigint_parsestr(a, strlen(a), &x);
+        bigint_parsestr(b, strlen(b), &y);
+
+        bigint_iadd(&x, &y);
+        bigint_tostr(&x, a);
+        printf("x + y : %s\n", a);
+
+        bigint_sub(&x, &y, &z);
+        bigint_tostr(&z, a);
+        printf("x - y : %s\n", a);
+
+        count = 0;
+        gcd_by_binary(&x, &y, &z, &count);
+        printf("gcd : %s\n", bigint_tostr(&z, line));
+    }
+}

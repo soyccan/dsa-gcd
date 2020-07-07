@@ -38,7 +38,7 @@
 #ifndef swap
 #define swap(x, y)          \
     {                       \
-        typeof(x) _t = (x); \
+        size_t _t = (x);    \
         (x) = (y);          \
         (y) = _t;           \
     }
